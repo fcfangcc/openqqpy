@@ -52,3 +52,11 @@ client.request_api('user/get_user_info')
  
 
 时间有限描述比较仓促,后续会整理好readme...
+
+## fangc20151126更新信息:
+
+获取Authorization Code函数里面添加了state参数，现要求必须添加该参数
+
+移除了获取Access Token里面的state参数，现在已不需要该参数
+
+_encode_params现用urllib.urlencode替代

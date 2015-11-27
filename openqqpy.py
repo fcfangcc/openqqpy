@@ -40,8 +40,7 @@ def _http_request(url, method, params, authorization):
     执行http请求,目前两种格式,GET,POST
     """
     boundary = None
-    args = _encode_params(params)
-
+    args = urllib.urlencode(params)
     http_url = '%s?%s' % (url, args) if method == _HTTP_GET else url
     http_params = None if method == _HTTP_GET else args
 
@@ -52,7 +51,7 @@ def _http_request(url, method, params, authorization):
     resp = urllib2.urlopen(req)
     body = str(resp.read())
     #body = body[9:-3]
-    print body
+    # print body
     v_json = json.loads(body, object_hook=_obj_hook)
     if hasattr(v_json, 'error'):
         raise OpenQQError(v_json.error, v_json.error_description)
@@ -93,7 +92,6 @@ class OpenQQClient(object):
         # QQ微博 url
         self.t_api_url = 'https://%s/%s/' % (domain, 't')
 
-
     def set_access_token(self, access_token, expires_in):
         """
             设置access_token
@@ -101,21 +99,21 @@ class OpenQQClient(object):
         self.access_token = access_token
         self.expires = expires_in
 
-
     def set_openid(self, openid):
         self.openid = openid
 
-
-    def get_auth_url(self, redirect_uri=None):
+    def get_auth_url(self, redirect_uri=None, state=1):
         """
             获取登录的url,需要跳转至该url进行QQ登录
         """
         redirect = redirect_uri if redirect_uri else self.redirect_uri
-        params = {'client_id':self.client_id,
+        params = {'client_id': self.client_id,
                   'response_type': self.response_type,
                   'redirect_uri': redirect,
-                  'scope': self.scope}
-        return '%s%s/%s?%s' % (self.base_url, self.version, 'authorize', _encode_params(params))
+                  'scope': self.scope,
+                  'state': state}
+        url = '%s%s/%s?%s' % (self.base_url, self.version, 'authorize', urllib.urlencode(params))
+        return url
 
     def request_access_token(self, code, redirect_uri=None):
         """
@@ -128,14 +126,13 @@ class OpenQQClient(object):
                   'client_id': self.client_id,
                   'client_secret': self.client_secret,
                   'code': code,
-                  'redirect_uri': redirect,
-                  'state':'xulu'}
-        url = '%s%s/%s?%s' % (self.base_url, self.version, 'token', _encode_params(params))
+                  'redirect_uri': redirect,}
+        url = '%s%s/%s?%s' % (self.base_url, self.version, 'token', urllib.urlencode(params))
         resp = urllib2.urlopen(url)
         result = urlparse.parse_qs(resp.read(), True)
         access_token = str(result['access_token'][0])
         expires_in = float(int(result['expires_in'][0]) + int(time.time()))
-
+        self.set_access_token(access_token, expires_in)
         return {'access_token':access_token, 'expires_in': expires_in}
 
     def request_openid(self):
@@ -143,13 +140,13 @@ class OpenQQClient(object):
             获得openid,(腾讯返回access_token,openid及普通api的返回,这3个居然格式不一致.不会全部都返回JSON啊,哎......)
         """
         params = {'access_token': self.access_token}
-        url = '%s%s/%s?%s' % (self.base_url, self.version,'me',_encode_params(params))
+        url = '%s%s/%s?%s' % (self.base_url, self.version, 'me', urllib.urlencode(params))
         resp = urllib2.urlopen(url)
         v_str = str(resp.read())
         v_str = v_str[9:-3]
         v_json = json.loads(v_str)
         openid = v_json['openid']
-
+        self.set_openid(openid)
         return openid
 
     def is_expires(self):
@@ -165,7 +162,7 @@ class OpenQQClient(object):
         params.update({'access_token': self.access_token,
                        'oauth_consumer_key': self.client_id,
                        'openid': self.openid})
-        print '%s%s' % (self.base_url, api)
+        # print '%s%s' % (self.base_url, api)
         if self.is_expires():
             raise OpenQQError('21327', 'expired_token')
         return _http_request('%s%s' % (self.base_url, api), method, params, self.access_token)
